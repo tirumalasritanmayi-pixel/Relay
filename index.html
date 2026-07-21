@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relay — pass notes, not chats</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5f4227">
+<link rel="icon" href="icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Relay">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cork: #7a5738;
+    --cork-dark: #5f4227;
+    --paper: #f3ecd9;
+    --paper-shadow: #d8cfb2;
+    --ink: #23303c;
+    --ink-soft: #5b6672;
+    --pin: #c8433f;
+    --highlight: #f4c945;
+    --thread: #7c8a4a;
+    --ok: #3f7a56;
+    --radius: 3px;
+    --display: 'Space Grotesk', sans-serif;
+    --body: 'Inter', sans-serif;
+    --hand: 'Caveat', cursive;
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important;} }
+  body{
+    margin:0;
+    font-family:var(--body);
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 1px 1px, rgba(0,0,0,0.16) 1px, transparent 0) 0 0/16px 16px,
+      linear-gradient(var(--cork), var(--cork-dark));
+    min-height:100vh;
+  }
+  header{
+    padding:28px 20px 18px;
+    text-align:center;
+  }
+  header h1{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:clamp(28px,5vw,40px);
+    color:var(--paper);
+    letter-spacing:-0.02em;
+    margin:0;
+  }
+  header p{
+    font-family:var(--hand);
+    font-size:20px;
+    color:var(--highlight);
+    margin:2px 0 0;
+  }
+  .board{
+    max-width:920px;
+    margin:0 auto;
+    padding:10px 16px 60px;
+  }
+  .topbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+    background:rgba(0,0,0,0.18);
+    border-radius:var(--radius);
+    padding:10px 14px;
+    margin-bottom:22px;
+    color:var(--paper);
+    font-size:14px;
+  }
+  .topbar label{opacity:0.8; margin-right:6px;}
+  select, input[type=text], textarea, input[type=date]{
+    font-family:var(--body);
+    border:1px solid var(--paper-shadow);
+    background:var(--paper);
+    color:var(--ink);
+    padding:8px 10px;
+    border-radius:var(--radius);
+    font-size:14px;
+  }
+  button{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.01em;
+    border:none;
+    border-radius:var(--radius);
+    padding:9px 14px;
+    cursor:pointer;
+    background:var(--highlight);
+    color:var(--ink);
+  }
+  button:hover{filter:brightness(1.06);}
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:3px solid var(--highlight);
+    outline-offset:2px;
+  }
+  button.secondary{background:var(--paper); }
+  button.ghost{background:transparent; color:var(--paper); border:1px solid rgba(255,255,255,0.4);}
+  .groups-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;}
+  .group-tab{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:14px;
+    padding:9px 16px;
+    border-radius:20px;
+    background:rgba(0,0,0,0.2);
+    color:var(--paper);
+    cursor:pointer;
+    border:2px solid transparent;
+  }
+  .group-tab.active{background:var(--paper); color:var(--ink); border-color:var(--highlight);}
+  .empty{
+    color:var(--paper);
+    font-family:var(--hand);
+    font-size:22px;
+    text-align:center;
+    padding:40px 20px;
+    opacity:0.85;
+  }
+  .card{
+    position:relative;
+    background:var(--paper);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.28);
+    border-radius:2px;
+    padding:20px 20px 16px;
+    margin:0 0 34px;
+    transform:rotate(var(--tilt,-0.6deg));
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:-9px; left:50%; transform:translateX(-50%);
+    width:16px; height:16px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ff8f8c, var(--pin));
+    box-shadow:0 3px 4px rgba(0,0,0,0.4);
+  }
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .subject{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:19px;
+  }
+  .meta{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .tag{
+    display:inline-block;
+    background:var(--highlight);
+    color:var(--ink);
+    font-family:var(--display);
+    font-weight:700;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding:3px 8px;
+    border-radius:2px;
+  }
+  .needed{
+    margin:10px 0 4px;
+    font-size:15px;
+  }
+  .author-line{
+    font-family:var(--hand);
+    font-size:18px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+  .replies{
+    margin-top:16px;
+    border-top:1px dashed var(--paper-shadow);
+    padding-top:12px;
+  }
+  .replies-label{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .stub{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background:#fffdf6;
+    border:1px solid var(--paper-shadow);
+    border-radius:2px;
+    padding:10px 12px;
+    margin-bottom:8px;
+    position:relative;
+  }
+  .stub.used{border-color:var(--ok); background:#f2f8f4;}
+  .stub .clip{
+    width:6px; align-self:stretch; border-radius:3px; background:var(--thread);
+  }
+  .stub-body{flex:1; min-width:0;}
+  .stub-from{font-family:var(--display); font-weight:700; font-size:13px;}
+  .stub-content{font-size:14px; margin-top:3px; white-space:pre-wrap; word-break:break-word;}
+  .stub-content img{max-width:100%; border-radius:2px; margin-top:6px; display:block;}
+  .stub-actions{display:flex; gap:6px; align-items:center;}
+  .used-badge{
+    font-family:var(--display); font-weight:700; font-size:11px;
+    color:var(--ok); text-transform:uppercase;
+  }
+  .no-replies{color:var(--ink-soft); font-size:13px; font-style:italic;}
+  .reply-form{
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+  }
+  .reply-form textarea{flex:1; min-width:180px; resize:vertical; min-height:38px;}
+  .fab-row{display:flex; justify-content:flex-end; margin-bottom:16px;}
+  dialog{
+    border:none; border-radius:6px; padding:0; max-width:420px; width:92vw;
+    box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  }
+  dialog::backdrop{background:rgba(20,14,8,0.55);}
+  .modal-body{padding:22px;}
+  .modal-body h2{font-family:var(--display); margin:0 0 14px; font-size:20px;}
+  .field{margin-bottom:12px; display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:12px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft);}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:16px;}
+  .contacts-note{font-size:12px; color:var(--ink-soft); margin-top:-4px;}
+  .no-dm-badge{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11px; color:var(--paper); opacity:0.85;
+  }
+  .bell-wrap{position:relative;}
+  .bell-btn{
+    background:transparent; border:1px solid rgba(255,255,255,0.4);
+    color:var(--paper); font-size:16px; padding:7px 10px; position:relative;
+  }
+  .bell-count{
+    position:absolute; top:-6px; right:-6px;
+    background:var(--pin); color:#fff;
+    font-family:var(--display); font-weight:700; font-size:10px;
+    min-width:16px; height:16px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    padding:0 3px;
+  }
+  .bell-drop{
+    position:absolute; top:calc(100% + 8px); right:0;
+    background:var(--paper); color:var(--ink);
+    width:280px; max-height:320px; overflow:auto;
+    border-radius:4px; box-shadow:0 10px 30px rgba(0,0,0,0.4);
+    padding:10px; z-index:20; font-size:13px;
+  }
+  .bell-drop h4{margin:2px 0 8px; font-family:var(--display); font-size:13px;}
+  .bell-item{padding:8px 6px; border-bottom:1px solid var(--paper-shadow); cursor:pointer;}
+  .bell-item:last-child{border-bottom:none;}
+  .bell-item b{display:block; font-size:13px;}
+  .bell-item span{color:var(--ink-soft); font-size:12px;}
+  .bell-empty{color:var(--ink-soft); font-style:italic; padding:6px;}
+  .code-display{
+    font-family:var(--display); font-weight:700; font-size:26px;
+    letter-spacing:0.08em; background:var(--cork); color:var(--paper);
+    padding:12px; border-radius:4px; text-align:center; margin:6px 0 4px;
+  }
+  .join-tabs{display:flex; gap:8px; margin-bottom:14px;}
+  .join-tabs button{flex:1; background:var(--paper); border:1px solid var(--paper-shadow); color:var(--ink);}
+  .join-tabs button.active{background:var(--highlight); border-color:var(--highlight);}
+  .hint{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .group-tab-wrap{display:flex; align-items:center; gap:4px;}
+  .delete-group-btn{
+    background:transparent; border:none; color:var(--paper); opacity:0.55;
+    font-size:14px; padding:2px 6px; cursor:pointer;
+  }
+  .delete-group-btn:hover{opacity:1; color:var(--pin);}
+  .members-row{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    color:var(--paper); font-size:13px; margin:-6px 0 18px;
+  }
+  .member-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(0,0,0,0.2); padding:4px 10px 4px 8px; border-radius:14px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:#7a8a94; flex-shrink:0;}
+  .dot.online{background:#5fd68a; box-shadow:0 0 5px #5fd68a;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Relay</h1>
+  <p>send notes, not messages</p>
+</header>
+
+<div class="board">
+  <div class="topbar">
+    <div>
+      <label for="whoami">Viewing as</label>
+      <select id="whoami"></select>
+    </div>
+    <span class="no-dm-badge">📌 announcements only — no chat, no DMs</span>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="bell-wrap">
+        <button class="bell-btn" id="bellBtn" aria-label="Notifications">🔔<span class="bell-count" id="bellCount" style="display:none;">0</span></button>
+        <div class="bell-drop" id="bellDrop" style="display:none;"></div>
+      </div>
+      <button class="ghost" id="installBtn" style="display:none;">⬇️ Install app</button>
+      <button class="ghost" id="notifBtn" title="Get notified in this browser when you're on another tab">🔔 Enable alerts</button>
+      <button class="ghost" id="renameBtn">Edit my name</button>
+    </div>
+  </div>
+
+  <div class="groups-row" id="groupTabs"></div>
+  <div id="inviteLine" style="color:var(--paper); font-size:13px; margin:-10px 0 8px; opacity:0.85;"></div>
+  <div class="members-row" id="membersRow"></div>
+
+  <div class="fab-row" id="fabRow" style="display:none; justify-content:space-between;">
+    <button class="secondary" id="addTesterBtn">+ Simulate a friend (for testing)</button>
+    <button id="newAnnouncementBtn">+ Post announcement</button>
+  </div>
+
+  <div id="feed"></div>
+</div>
+
+<dialog id="groupDialog">
+  <div class="modal-body">
+    <div class="join-tabs">
+      <button id="tabCreate" class="active">Create group</button>
+      <button id="tabJoin">Join with code</button>
+    </div>
+
+    <div id="createPane">
+      <h2>New study group</h2>
+      <div class="field">
+        <label for="groupName">Group name</label>
+        <input type="text" id="groupName" placeholder="e.g. AP Bio Squad">
+      </div>
+      <div class="hint">No phone numbers needed — you'll get a code to share with friends however you already talk to them.</div>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelGroup">Cancel</button>
+        <button id="saveGroup">Create group</button>
+      </div>
+    </div>
+
+    <div id="createdPane" style="display:none;">
+      <h2>Group created 🎉</h2>
+      <div class="field">
+        <label>Share this code with your friends</label>
+        <div class="code-display" id="newGroupCode"></div>
+        <div class="hint">They tap "Join with code" and enter it — no numbers stored, ever.</div>
+      </div>
+      <div class="modal-actions">
+        <button id="doneCreated">Done</button>
+      </div>
+    </div>
+
+    <div id="joinPane" style="display:none;">
+      <h2>Join a group</h2>
+      <div class="field">
+        <label for="joinCode">Group code</label>
+        <input type="text" id="joinCode" placeholder="e.g. 4F9K2" style="text-transform:uppercase;">
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelJoin">Cancel</button>
+        <button id="saveJoin">Join</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="announceDialog">
+  <div class="modal-body">
+    <h2>Post an announcement</h2>
+    <div class="field">
+      <label for="annSubject">Subject / exam</label>
+      <input type="text" id="annSubject" placeholder="e.g. Chem — Unit 4 Test">
+    </div>
+    <div class="field">
+      <label for="annDate">Date you were absent / exam date</label>
+      <input type="date" id="annDate">
+    </div>
+    <div class="field">
+      <label for="annNeeded">What notes do you need?</label>
+      <textarea id="annNeeded" rows="3" placeholder="e.g. Everything from Ch. 5, especially the reaction rates section"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="cancelAnn">Cancel</button>
+      <button id="saveAnn">Post to group</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="welcomeDialog">
+  <div class="modal-body">
+    <h2>Welcome to Relay</h2>
+    <div class="field">
+      <label for="welcomeName">What's your name?</label>
+      <input type="text" id="welcomeName" placeholder="e.g. Sam">
+    </div>
+    <div class="hint">This is what your study group will see you as.</div>
+    <div class="modal-actions">
+      <button id="saveWelcomeName">Continue</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="nameDialog">
+  <div class="modal-body">
+    <h2>Your name</h2>
+    <div class="field">
+      <label for="nameInput">What should contacts see you as?</label>
+      <input type="text" id="nameInput" placeholder="e.g. Sam">
+    </div>
+    <div class="modal-actions">
+      <button id="saveName">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const DATA_KEY = 'relay-data-v1';
+let db = null;
+let currentUserId = null;
+let activeGroupId = null;
+
+function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+
+async function loadData(){
+  try{
+    const res = await window.storage.get(DATA_KEY, true);
+    db = JSON.parse(res.value);
+  }catch(e){
+    db = seed();
+    await window.storage.set(DATA_KEY, JSON.stringify(db), true);
+  }
+}
+
+async function saveData(){
+  await window.storage.set(DATA_KEY, JSON.stringify(db), true);
+}
+
+function seed(){
+  const you = { id: uid('u'), name: 'You', lastSeen: Date.now() };
+  return { users: [you], groups: [], announcements: [], replies: [], usedReply: {} };
+}
+
+function genCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code;
+  do{
+    code = Array.from({length:5}, ()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  } while(db.groups.some(g=>g.code===code));
+  return code;
+}
+
+async function getCurrentUserId(){
+  try{
+    const res = await window.storage.get('relay-current-user', false);
+    if(res && res.value && db.users.find(u=>u.id===res.value)) return res.value;
+  }catch(e){}
+  const id = db.users[0].id;
+  await window.storage.set('relay-current-user', id, false);
+  return id;
+}
+
+async function setCurrentUserId(id){
+  currentUserId = id;
+  try{ await window.storage.set('relay-current-user', id, false); }catch(e){}
+}
+
+function getUser(id){ return db.users.find(u=>u.id===id); }
+
+function myGroups(){
+  return db.groups.filter(g => g.memberIds.includes(currentUserId));
+}
+
+function render(){
+  renderWhoami();
+  renderGroupTabs();
+  renderFeed();
+  renderBell();
+}
+
+function unreadItems(){
+  const me = getUser(currentUserId);
+  const lastSeen = me.lastSeen || 0;
+  const myGroupIds = myGroups().map(g=>g.id);
+  const items = [];
+  db.announcements.forEach(a=>{
+    if(myGroupIds.includes(a.groupId) && a.authorId!==currentUserId && a.createdAt>lastSeen){
+      items.push({ type:'announcement', groupId:a.groupId, at:a.createdAt,
+        title: getUser(a.authorId).name + ' needs notes',
+        detail: a.subject });
+    }
+  });
+  db.replies.forEach(r=>{
+    const ann = db.announcements.find(a=>a.id===r.announcementId);
+    if(!ann || ann.authorId!==currentUserId) return;
+    if(r.authorId===currentUserId) return;
+    if(r.createdAt>lastSeen){
+      items.push({ type:'reply', groupId:ann.groupId, at:r.createdAt,
+        title: getUser(r.authorId).name + ' sent notes',
+        detail: ann.subject });
+    }
+  });
+  return items.sort((a,b)=>b.at-a.at);
+}
+
+function renderBell(){
+  const items = unreadItems();
+  const countEl = document.getElementById('bellCount');
+  if(items.length){
+    countEl.style.display = 'flex';
+    countEl.textContent = items.length > 9 ? '9+' : items.length;
+  } else {
+    countEl.style.display = 'none';
+  }
+  const drop = document.getElementById('bellDrop');
+  if(drop.style.display !== 'none'){
+    drop.innerHTML = items.length
+      ? `<h4>New</h4>` + items.map(it=>`<div class="bell-item" data-group="${it.groupId}"><b>${escapeHtml(it.title)}</b><span>${escapeHtml(it.detail)}</span></div>`).join('')
+      : `<h4>New</h4><div class="bell-empty">Nothing new.</div>`;
+    drop.querySelectorAll('.bell-item').forEach(el=>{
+      el.addEventListener('click', ()=>{ activeGroupId = el.dataset.group; render(); });
+    });
+  }
+}
+
+function renderWhoami(){
+  const sel = document.getElementById('whoami');
+  sel.title = 'For testing: simulate being different group members on this device';
+  sel.innerHTML = db.users.map(u => `<option value="${u.id}" ${u.id===currentUserId?'selected':''}>${escapeHtml(u.name)}</option>`).join('');
+}
+
+function renderGroupTabs(){
+  const wrap = document.getElementById('groupTabs');
+  const groups = myGroups();
+  let html = groups.map(g => `
+    <div class="group-tab-wrap">
+      <div class="group-tab ${g.id===activeGroupId?'active':''}" data-id="${g.id}">${escapeHtml(g.name)}</div>
+      <button class="delete-group-btn" data-id="${g.id}" title="Delete group" aria-label="Delete ${escapeHtml(g.name)}">✕</button>
+    </div>`).join('');
+  html += `<div class="group-tab" id="newGroupTab" style="border-style:dashed; opacity:0.9;">+ New group</div>`;
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.group-tab[data-id]').forEach(el=>{
+    el.addEventListener('click', ()=>{ activeGroupId = el.dataset.id; render(); });
+  });
+  wrap.querySelectorAll('.delete-group-btn').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); deleteGroup(el.dataset.id); });
+  });
+  document.getElementById('newGroupTab').addEventListener('click', openGroupDialog);
+
+  document.getElementById('fabRow').style.display = activeGroupId ? 'flex' : 'none';
+
+  if(!groups.find(g=>g.id===activeGroupId)){
+    activeGroupId = groups.length ? groups[0].id : null;
+  }
+
+  const inviteLine = document.getElementById('inviteLine');
+  const g = groups.find(g=>g.id===activeGroupId);
+  inviteLine.textContent = g ? `Invite code: ${g.code} — share it however you'd normally message a friend` : '';
+  renderMembers(g);
+}
+
+const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
+
+function renderMembers(g){
+  const row = document.getElementById('membersRow');
+  if(!g){ row.innerHTML = ''; return; }
+  const now = Date.now();
+  row.innerHTML = g.memberIds.map(id=>{
+    const u = getUser(id);
+    if(!u) return '';
+    const online = u.lastActiveAt && (now - u.lastActiveAt) < ACTIVE_WINDOW_MS;
+    return `<span class="member-chip"><span class="dot ${online?'online':''}"></span>${escapeHtml(u.name)}</span>`;
+  }).join('');
+}
+
+async function deleteGroup(groupId){
+  const g = db.groups.find(gr=>gr.id===groupId);
+  if(!g) return;
+  if(!confirm(`Delete "${g.name}"? This removes it and all its announcements/notes for everyone in the group.`)) return;
+  const annIds = db.announcements.filter(a=>a.groupId===groupId).map(a=>a.id);
+  db.announcements = db.announcements.filter(a=>a.groupId!==groupId);
+  db.replies = db.replies.filter(r=>!annIds.includes(r.announcementId));
+  annIds.forEach(id=>delete db.usedReply[id]);
+  db.groups = db.groups.filter(gr=>gr.id!==groupId);
+  if(activeGroupId===groupId) activeGroupId = null;
+  await saveData();
+  render();
+}
+
+function renderFeed(){
+  const feed = document.getElementById('feed');
+  if(!activeGroupId){
+    feed.innerHTML = `<div class="empty">No study groups yet — pin one to the board to get started.</div>`;
+    return;
+  }
+  const anns = db.announcements.filter(a=>a.groupId===activeGroupId).sort((a,b)=>b.createdAt-a.createdAt);
+  if(!anns.length){
+    feed.innerHTML = `<div class="empty">Nothing posted here yet. Missed a class? Post what you need.</div>`;
+    return;
+  }
+  feed.innerHTML = anns.map((a,i) => renderCard(a, i)).join('');
+
+  feed.querySelectorAll('.send-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>sendReply(btn.dataset.annId));
+  });
+  feed.querySelectorAll('.mark-used').forEach(btn=>{
+    btn.addEventListener('click', ()=>markUsed(btn.dataset.annId, btn.dataset.replyId));
+  });
+  feed.querySelectorAll('.file-input').forEach(inp=>{
+    inp.addEventListener('change', ()=>handleFile(inp));
+  });
+}
+
+function renderCard(a, idx){
+  const author = getUser(a.authorId);
+  const replies = db.replies.filter(r=>r.announcementId===a.id).sort((x,y)=>x.createdAt-y.createdAt);
+  const usedId = db.usedReply[a.id];
+  const tilt = (idx % 2 === 0) ? '-0.7deg' : '0.6deg';
+
+  const repliesHtml = replies.length
+    ? replies.map(r=>{
+        const from = getUser(r.authorId);
+        const used = r.id === usedId;
+        return `<div class="stub ${used?'used':''}">
+          <div class="clip"></div>
+          <div class="stub-body">
+            <div class="stub-from">${escapeHtml(from ? from.name : 'Someone')} ${used?'<span class="used-badge">· used these</span>':''}</div>
+            <div class="stub-content">${r.type==='image' ? `<img src="${r.content}" alt="Notes photo from ${escapeHtml(from?from.name:'contact')}">` : escapeHtml(r.content)}</div>
+          </div>
+          ${a.authorId===currentUserId && !used ? `<div class="stub-actions"><button class="secondary mark-used" data-ann-id="${a.id}" data-reply-id="${r.id}">Mark used</button></div>` : ''}
+        </div>`;
+      }).join('')
+    : `<div class="no-replies">No notes sent yet.</div>`;
+
+  return `<div class="card" style="--tilt:${tilt}">
+    <div class="card-top">
+      <div>
+        <div class="subject">${escapeHtml(a.subject)}</div>
+        <div class="meta">${a.date ? formatDate(a.date) : ''}</div>
+      </div>
+      <span class="tag">Needs notes</span>
+    </div>
+    <div class="needed">${escapeHtml(a.needed)}</div>
+    <div class="author-line">— posted by ${escapeHtml(author ? author.name : 'someone')}</div>
+
+    <div class="replies">
+      <div class="replies-label">Notes sent (${replies.length})</div>
+      ${repliesHtml}
+      <div class="reply-form">
+        <textarea rows="1" placeholder="Type your notes to attach..." id="text_${a.id}"></textarea>
+        <label class="secondary" style="display:inline-flex; align-items:center; padding:9px 12px; border-radius:3px; background:var(--paper); border:1px solid var(--paper-shadow); cursor:pointer; font-size:13px;">
+          📎 Photo
+          <input type="file" accept="image/*" class="file-input" data-ann-id="${a.id}" style="display:none;">
+        </label>
+        <button class="send-btn" data-ann-id="${a.id}">Send notes</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+let pendingImage = {};
+
+function handleFile(inp){
+  const annId = inp.dataset.annId;
+  const file = inp.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingImage[annId] = reader.result;
+    inp.parentElement.textContent = '✓ photo attached';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function sendReply(annId){
+  const textEl = document.getElementById('text_'+annId);
+  const text = textEl.value.trim();
+  const img = pendingImage[annId];
+  if(!text && !img){ textEl.focus(); return; }
+
+  if(img){
+    db.replies.push({ id: uid('r'), announcementId: annId, authorId: currentUserId, type:'image', content: img, createdAt: Date.now() });
+    delete pendingImage[annId];
+  }
+  if(text){
+    db.replies.push({ id: uid('r'), announcementId: annId, authorId: currentUserId, type:'text', content: text, createdAt: Date.now()+1 });
+  }
+  await saveData();
+  render();
+}
+
+async function markUsed(annId, replyId){
+  db.usedReply[annId] = replyId;
+  await saveData();
+  render();
+}
+
+function formatDate(d){
+  try{
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  }catch(e){ return d; }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// --- Dialog wiring ---
+const groupDialog = document.getElementById('groupDialog');
+const announceDialog = document.getElementById('announceDialog');
+const nameDialog = document.getElementById('nameDialog');
+
+function showPane(pane){
+  document.getElementById('createPane').style.display = pane==='create' ? 'block' : 'none';
+  document.getElementById('createdPane').style.display = pane==='created' ? 'block' : 'none';
+  document.getElementById('joinPane').style.display = pane==='join' ? 'block' : 'none';
+  document.getElementById('tabCreate').classList.toggle('active', pane==='create');
+  document.getElementById('tabJoin').classList.toggle('active', pane==='join');
+}
+function openGroupDialog(){
+  document.getElementById('groupName').value = '';
+  document.getElementById('joinCode').value = '';
+  showPane('create');
+  groupDialog.showModal();
+}
+document.getElementById('tabCreate').addEventListener('click', ()=>showPane('create'));
+document.getElementById('tabJoin').addEventListener('click', ()=>showPane('join'));
+document.getElementById('cancelGroup').addEventListener('click', ()=>groupDialog.close());
+document.getElementById('cancelJoin').addEventListener('click', ()=>groupDialog.close());
+document.getElementById('doneCreated').addEventListener('click', ()=>groupDialog.close());
+
+document.getElementById('saveGroup').addEventListener('click', async ()=>{
+  const name = document.getElementById('groupName').value.trim();
+  if(!name) return;
+  const g = { id: uid('g'), name, memberIds: [currentUserId], code: genCode() };
+  db.groups.push(g);
+  activeGroupId = g.id;
+  await saveData();
+  document.getElementById('newGroupCode').textContent = g.code;
+  showPane('created');
+  render();
+});
+
+document.getElementById('saveJoin').addEventListener('click', async ()=>{
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if(!code) return;
+  const g = db.groups.find(gr=>gr.code===code);
+  if(!g){ document.getElementById('joinCode').setCustomValidity('No group with that code'); document.getElementById('joinCode').reportValidity(); return; }
+  if(!g.memberIds.includes(currentUserId)) g.memberIds.push(currentUserId);
+  activeGroupId = g.id;
+  await saveData();
+  groupDialog.close();
+  render();
+});
+document.getElementById('joinCode').addEventListener('input', (e)=>e.target.setCustomValidity(''));
+
+document.getElementById('newAnnouncementBtn').addEventListener('click', ()=>{
+  document.getElementById('annSubject').value = '';
+  document.getElementById('annDate').value = '';
+  document.getElementById('annNeeded').value = '';
+  announceDialog.showModal();
+});
+document.getElementById('cancelAnn').addEventListener('click', ()=>announceDialog.close());
+document.getElementById('saveAnn').addEventListener('click', async ()=>{
+  const subject = document.getElementById('annSubject').value.trim();
+  const date = document.getElementById('annDate').value;
+  const needed = document.getElementById('annNeeded').value.trim();
+  if(!subject || !needed) return;
+  db.announcements.push({
+    id: uid('a'), groupId: activeGroupId, authorId: currentUserId,
+    subject, date, needed, createdAt: Date.now()
+  });
+  await saveData();
+  announceDialog.close();
+  render();
+});
+
+document.getElementById('notifBtn').addEventListener('click', async ()=>{
+  await requestNotifPermission();
+  const btn = document.getElementById('notifBtn');
+  btn.textContent = Notification.permission === 'granted' ? '🔔 Alerts on' : '🔔 Enable alerts';
+});
+
+document.getElementById('renameBtn').addEventListener('click', ()=>{
+  document.getElementById('nameInput').value = getUser(currentUserId).name;
+  nameDialog.showModal();
+});
+document.getElementById('saveName').addEventListener('click', async ()=>{
+  const name = document.getElementById('nameInput').value.trim();
+  if(!name) return;
+  getUser(currentUserId).name = name;
+  await saveData();
+  nameDialog.close();
+  render();
+});
+
+document.getElementById('addTesterBtn').addEventListener('click', async ()=>{
+  const name = prompt('Name for this test friend? (only visible on this device, for trying out the flow)');
+  if(!name || !name.trim()) return;
+  const u = { id: uid('u'), name: name.trim(), lastSeen: 0 };
+  db.users.push(u);
+  const g = db.groups.find(gr=>gr.id===activeGroupId);
+  if(g && !g.memberIds.includes(u.id)) g.memberIds.push(u.id);
+  await saveData();
+  await setCurrentUserId(u.id);
+  render();
+});
+
+document.getElementById('bellBtn').addEventListener('click', async ()=>{
+  const drop = document.getElementById('bellDrop');
+  const opening = drop.style.display === 'none';
+  drop.style.display = opening ? 'block' : 'none';
+  if(opening){
+    renderBell();
+  } else {
+    getUser(currentUserId).lastSeen = Date.now();
+    await saveData();
+    renderBell();
+  }
+});
+
+document.getElementById('whoami').addEventListener('change', async (e)=>{
+  await setCurrentUserId(e.target.value);
+  activeGroupId = null;
+  render();
+});
+
+// --- Presence heartbeat ---
+async function heartbeat(){
+  if(!currentUserId) return;
+  getUser(currentUserId).lastActiveAt = Date.now();
+  await saveData();
+  renderMembers(db.groups.find(g=>g.id===activeGroupId));
+}
+
+// --- Background-tab notifications (requires app open somewhere, even if not focused) ---
+let notifiedIds = new Set();
+async function checkForNotifications(){
+  if(document.visibilityState === 'visible') return;
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  const items = unreadItems();
+  items.forEach(it=>{
+    const key = it.type+it.at;
+    if(!notifiedIds.has(key)){
+      notifiedIds.add(key);
+      new Notification(it.title, { body: it.detail, tag: key });
+    }
+  });
+}
+
+async function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'default'){
+    await Notification.requestPermission();
+  }
+}
+
+// --- PWA: service worker + install prompt ---
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if(btn) btn.style.display = 'inline-flex';
+});
+document.getElementById('installBtn') && document.getElementById('installBtn').addEventListener('click', async () => {
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('installBtn').style.display = 'none';
+});
+
+document.getElementById('saveWelcomeName').addEventListener('click', async ()=>{
+  const name = document.getElementById('welcomeName').value.trim();
+  if(!name) return;
+  getUser(currentUserId).name = name;
+  await saveData();
+  try{ await window.storage.set('relay-onboarded', 'yes', false); }catch(e){}
+  document.getElementById('welcomeDialog').close();
+  render();
+  heartbeat();
+  setInterval(heartbeat, 25000);
+  setInterval(async ()=>{ await loadData(); checkForNotifications(); if(document.visibilityState==='visible') render(); }, 8000);
+});
+
+// --- Init ---
+(async function init(){
+  await loadData();
+  currentUserId = await getCurrentUserId();
+  const groups = myGroups();
+  activeGroupId = groups.length ? groups[0].id : null;
+  render();
+
+  let onboarded = false;
+  try{
+    const res = await window.storage.get('relay-onboarded', false);
+    onboarded = !!(res && res.value === 'yes');
+  }catch(e){}
+
+  if(!onboarded){
+    document.getElementById('welcomeName').value = '';
+    document.getElementById('welcomeDialog').showModal();
+    return; // heartbeat/polling starts after they submit their name
+  }
+
+  heartbeat();
+  setInterval(heartbeat, 25000);
+  setInterval(async ()=>{ await loadData(); checkForNotifications(); if(document.visibilityState==='visible') render(); }, 8000);
+})();
+</script>
+</body>
+</html>
